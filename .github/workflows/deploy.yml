@@ -1,27 +1,50 @@
-name: Deploy Hexo
+name: Hexo Auto Deploy
 
 on:
   push:
     branches:
-      - main  # 只有推送到 main 分支时才触发
+      - main  # 监听你推送源码的分支
 
 jobs:
-  build:
+  build-and-deploy:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout  # 第一步：把你的源码拉取到 GitHub 的虚拟电脑上
-        uses: actions/checkout@v4
+    
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
 
-      - name: Setup Node # 第二步：在虚拟电脑上安装 Node.js 环境
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          # 如果你的源码就在 main，这里保持 main
+          ref: main
+          submodules: 'recursive' # 自动拉取 Butterfly 等主题子模块
+          fetch-depth: 0
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
-      - name: Install Dependencies # 第三步：安装 Hexo 及其插件
-        run: npm install
+      - name: Install Dependencies
+        run: |
+          npm install hexo-cli -g
+          npm install
 
-      - name: Generate # 第四步：运行 Hexo 生成命令
-        run: npx hexo generate
+      - name: Generate Static Files
+        run: |
+          npx hexo clean
+          npx hexo generate
 
-      - name: Deploy # 第五步：将生成的 public 文件夹发布到 Pages
-        uses: actions/deploy-pages@v4
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: gh-pages  # 建议部署到新分支，防止覆盖源码
+          publish_dir: ./public
+          commit_message: "🚀 Auto Deploy: ${{ github.event.head_commit.message }}"
+          user_name: 'GitHub Actions Bot'
+          user_email: 'actions@github.com'
